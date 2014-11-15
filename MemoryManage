@@ -1,0 +1,644 @@
+
+#include <stdio.h>
+#include <stdlib.h>
+#define NUM_32_BYTE_BUF     8
+#define NUM_16_BYTE_BUF     8
+#define   test_bit(target,bit)  \
+((target >> bit) & (0x01))
+#define SET_BIT(target,bit) \
+(target=target|0x01<<bit);
+#define SET_ZBIT(target,bit) \
+(target=target&(~(0x01 << bit)));
+unsigned char buffer[32*NUM_32_BYTE_BUF + 16*NUM_16_BYTE_BUF];
+
+unsigned char byte_32_buf_mask = 0;
+unsigned char byte_16_buf_mask = 0;
+
+
+typedef struct type1 {
+     int id;
+     int score;
+     int whichbuffer;
+     int number;
+     struct type1 *next;
+     struct type1 *prev;
+}tQueueElementType1;
+
+typedef struct type2 {
+     int id;
+     int score[4];
+     int whichbuffer;
+     int number;
+     struct type2 *next;
+     struct type2 *prev;
+}tQueueElementType2;
+
+typedef struct {
+     tQueueElementType1 *type1Front;
+     tQueueElementType1 *type1Rear;
+     tQueueElementType2 *type2Front;
+     tQueueElementType2 *type2Rear;
+     int type1Count;
+     int type2Count;
+}tQueue;
+
+tQueue* createQueue(void);
+
+int enqueueType1(tQueue *queue, int id, int score);
+int dequeueType1(tQueue *queue, tQueueElementType1 *target);
+tQueueElementType1 *findTheTargetType1Node(tQueue *queue, int id);
+
+int enqueueType2(tQueue *queue, int id, int *score);
+int dequeueType2(tQueue *queue, tQueueElementType2 *target);
+tQueueElementType2 *findTheTargetType2Node(tQueue *queue, int id);
+
+void printQueue (tQueue *queue);
+void printBufferStatus (void);
+
+void  ourMalloc (int type, int size, void **target);
+void  ourFree (int type, void *target);
+
+//
+int  myLocationIsFull(int type);
+int  useOtherLocation(int type);
+//
+int main (void)
+{
+     tQueue *queue;
+     int operation;
+     tQueueElementType1 *targetType1;
+     tQueueElementType2 *targetType2;
+     
+     queue = createQueue();
+     //
+     int id;
+     int score;
+     int multiscore[4];
+     int ret,i;
+     //
+     while (1)
+     {
+
+          printf("Which type you are going to operate? \n");
+          printf("1. Add a type 1 item\n");
+          printf("2. Add a type 2 item\n");
+          printf("3. remove a type 1 item with a specific Id\n");
+          printf("4. remove a type 2 item with a specific Id\n");
+          
+          scanf("%d", &operation);
+          
+          if (operation == 1)
+          {
+               printf("1. enter id: \n");
+               scanf("%d",&id);
+               printf("2. enter ONE score value. \n");
+               scanf("%d",&score);
+               ret = enqueueType1 (queue,id,score);
+               
+               if (ret == 0)
+               {
+                    printf("Cannot enter to the queue\n");
+               }
+               printBufferStatus();
+          }
+          else if (operation == 2)
+          {
+               printf("1. enter id: \n");
+               scanf("%d",&id);
+               printf("2. enter FOUR score value. \n");
+               for (i=0; i<4; i++) {
+                    scanf("%d",&multiscore[i]);
+               }
+               ret = enqueueType2 (queue,id,multiscore);
+               
+               if (ret == 0)
+               {
+                    printf("Cannot enter to the queue \n");
+               }
+               printBufferStatus();
+               
+          }
+          else if (operation == 3)
+          {
+               printf ("1. enter an ID to remove \n");
+               scanf("%d",&id);
+               targetType1 = NULL;
+               targetType1 = findTheTargetType1Node (queue, id);
+               if (targetType1 == NULL)
+               {
+                    printf ("cannot find the target node \n");
+               }
+               else
+               {
+                    dequeueType1(queue, targetType1);
+               }
+               printBufferStatus();
+          }
+          else if (operation == 4)
+          {
+               printf ("1. enter an ID to remove \n");
+               scanf("%d",&id);
+               targetType2 = NULL;
+               targetType2 = findTheTargetType2Node (queue, id);
+               if (targetType2 == NULL)
+               {
+                    printf ("cannot find the target node \n");
+               }
+               else
+               {
+                    dequeueType2(queue, targetType2);
+               }
+               printBufferStatus();
+          }
+          else
+          {
+               printf ("no such operation \n");
+          }
+          
+          printQueue(queue);
+          
+     }
+     
+}
+
+
+tQueue* createQueue(void){
+     tQueue *queue;
+     queue=(tQueue *) malloc (sizeof(tQueue));
+     printf("sizeof(tQueue): %d \n", sizeof(tQueue));
+     if (queue)
+     {
+          queue->type1Front=NULL;
+          queue->type1Rear=NULL;
+          queue->type2Front=NULL;
+          queue->type2Rear=NULL;
+          queue->type1Count=0;
+          queue->type2Count=0;
+     }
+     return queue;
+}
+
+int enqueueType1(tQueue *queue, int id, int score)
+{
+     tQueueElementType1 *newptr = NULL;
+     
+     ourMalloc (1, sizeof(tQueueElementType1), (void *)&newptr);
+     
+     if (newptr == NULL)
+     {
+          printf("Enqueue False!!!\n");
+          return 0;
+     }
+     
+     newptr->id = id;
+     newptr->score = score;
+     newptr->next=NULL;
+     newptr->prev=NULL;
+     
+     if (queue->type1Count==0)
+     {
+          queue->type1Front = newptr;
+     }
+     else
+     {
+          queue->type1Rear->next = newptr;
+     }
+     
+     newptr->prev = queue->type1Rear;
+     queue->type1Rear = newptr;
+     queue->type1Count++;
+     
+     return 1;
+}
+int enqueueType2(tQueue *queue, int id, int score2[])
+{
+     tQueueElementType2 *newptr = NULL;
+     int i=0;
+     ourMalloc (2, sizeof(tQueueElementType2), (void *)&newptr);
+     
+     if (newptr == NULL)
+     {
+          printf("Enqueue False");
+          return 0;
+     }
+     
+     newptr->id = id;
+     for (i=0; i<4; i++) {
+          newptr->score[i] = score2[i];
+     }
+     
+     newptr->next=NULL;
+     newptr->prev=NULL;
+     
+     if (queue->type2Count==0)
+     {
+          queue->type2Front = newptr;
+     }
+     else
+     {
+          queue->type2Rear->next = newptr;
+     }
+     
+     newptr->prev = queue->type2Rear;
+     queue->type2Rear = newptr;
+     queue->type2Count++;
+     
+     return 1;
+}
+
+int dequeueType1(tQueue *queue, tQueueElementType1 *target)
+{
+     
+     if (queue->type1Count == 1)
+     {
+          queue->type1Rear = queue->type1Front = NULL;
+     }
+     else if (target == queue->type1Front)
+     {
+          queue->type1Front = queue->type1Front->next;
+     }
+     else if (target == queue->type1Rear)
+     {
+          queue->type1Rear = queue->type1Rear->prev;
+     }
+     else
+     {
+          target->prev->next = target->next;
+     }
+     
+     queue->type1Count--;
+     ourFree(1, target);
+     return 1;
+}
+int dequeueType2(tQueue *queue, tQueueElementType2 *target)
+{
+     
+     if (queue->type2Count == 1)
+     {
+          queue->type2Rear = queue->type2Front = NULL;
+     }
+     else if (target == queue->type2Front)
+     {
+          queue->type2Front = queue->type2Front->next;
+     }
+     else if (target == queue->type2Rear)
+     {
+          queue->type2Rear = queue->type2Rear->prev;
+     }
+     else
+     {
+          target->prev->next = target->next;
+     }
+     
+     queue->type2Count--;
+     ourFree(2, target);
+     return 1;
+}
+
+tQueueElementType1 *findTheTargetType1Node(tQueue *queue, int id)
+{
+     int i;
+     tQueueElementType1 *target = queue->type1Front;
+     
+     for (i = 0; i < queue->type1Count; i++)
+     {
+          if (target->id == id)
+          {
+               return target;
+          }
+          else
+          {
+               target = target->next;
+          }
+     }
+     return NULL;
+}
+tQueueElementType2 *findTheTargetType2Node(tQueue *queue, int id)
+{
+     int i;
+     tQueueElementType2 *target = queue->type2Front;
+     
+     for (i = 0; i < queue->type2Count; i++)
+     {
+          if (target->id == id)
+          {
+               return target;
+          }
+          else
+          {
+               target = target->next;
+          }
+     }
+     return NULL;
+}
+void printQueue (tQueue *queue)
+{
+     int i,j;
+     tQueueElementType1 *target = queue->type1Front;
+     tQueueElementType2 *target2 = queue->type2Front;
+     printf("type 1 queue: ");
+     for (i = 0; i < queue->type1Count; i++)
+     {
+          printf ("%d ", target->id);
+          target = target->next;
+     }
+     
+     printf("\n");
+     
+     printf("type 2 queue: ");
+     for (i = 0; i < queue->type2Count; i++)
+     {
+          printf ("%d ", target2->id);
+          target2 = target2->next;
+     }
+     printf("\n");
+}
+
+void printBufferStatus (void)
+{
+     int i;
+     unsigned char mask = 0x80;
+     
+     printf ("byte_16_buf_mask: ");
+     for (i = 0; i< 8; i++)
+     {
+          printf ("%d ", (byte_16_buf_mask&mask) >> (7-i));
+          mask = mask >> 1;
+     }
+     mask = 0x80;
+     printf ("\nbyte_32_buf_mask: ");
+     for (i = 0; i< 8; i++)
+     {
+          printf ("%d ", (byte_32_buf_mask&mask) >> (7-i));
+          mask = mask >> 1;
+     }    
+     printf ("\n");
+     
+//     printf("buffer:\n");
+//     for (i=0; i<24; i++) {
+//          
+//          printf("%d",i*16);
+//          if (i*16<10) {
+//               printf("__");
+//          }
+//          if (i*16<100&&i*16>10) {
+//               printf("_");
+//          }
+//          printf("-");
+//          if (i==23) {
+//               printf("%d",i*16);
+//          }
+//     }
+//     printf ("\n");
+//     for (i=0; i<24; i++) {
+//          if (buffer[i*16]!=NULL) {
+//               printf("O");
+//          }else{
+//               printf(" ");
+//          }
+//          
+//          printf("  ");
+//          
+//          
+//          printf("-");
+//     }
+//     printf ("\n");
+     
+     
+}
+void  ourMalloc(int type, int size, void **target){
+     int planb;
+     int failAssign=0;
+     int normalAssignNumber;
+     tQueueElementType1 *tmpType1;
+     tQueueElementType2 *tmpType2;
+     if (type==1) {
+          if (myLocationIsFull(1)==9) {
+               //fail to assign to my location
+               planb=1;
+          }else{
+               normalAssignNumber=myLocationIsFull(1);
+          }
+          
+          if (planb==1) {
+               printf("\nmy location is full,,try to use plan b\n");
+               failAssign=useOtherLocation(1);
+               if (failAssign==9) {
+                    printf("fail to assign,error\n");
+               }else{
+                    printf("failAssign:%d\n",failAssign-1);
+                    SET_BIT(byte_32_buf_mask, (failAssign-1));
+                    
+                    
+                    *target=(tQueueElementType1 *)(&buffer[0+(7-(failAssign-1))*32]);
+                    tmpType1=(tQueueElementType1 *)*target;
+                    tmpType1->number=(failAssign-1);
+                    tmpType1->whichbuffer=1;
+                    printf("buffer location:%d\nwhichbuffer: %d\nwhich bit: %d\n",0+(7-(failAssign-1))*32,tmpType1->whichbuffer,tmpType1->number);
+               }
+               
+          }else{
+               //normal assign
+
+               printf("location comeing start to fuLL:%d %d\n",normalAssignNumber,normalAssignNumber-1);
+               /* 
+                assign area
+                
+                
+                */
+               SET_BIT(byte_16_buf_mask, normalAssignNumber);
+               SET_BIT(byte_16_buf_mask, (normalAssignNumber-1));
+               
+               
+               *target=(tQueueElementType1 *)(&buffer[256+(7-(normalAssignNumber))*16]);
+               tmpType1=(tQueueElementType1 *)*target;
+               tmpType1->number=normalAssignNumber;
+               tmpType1->whichbuffer=2;
+               printf("buffer location:%d\nwhichbuffer: %d\nwhich bit: %d\n",256+(7-normalAssignNumber)*16,tmpType1->whichbuffer,normalAssignNumber);
+          }
+          
+                    
+     }
+     else if (type==2){
+          if (myLocationIsFull(2)==9) {
+               //fail to assign to my location
+               planb=1;
+          }else{
+               normalAssignNumber=myLocationIsFull(2);
+          }
+          
+          if (planb==1) {
+               //plab b
+               printf("\nmy location is full,try to use plan b\n");
+               failAssign=useOtherLocation(2);
+               if (failAssign==9) {
+                    printf("fail to assign,error\n");
+               }else{
+                    printf("failAssign:%d\n",failAssign);
+                    SET_BIT(byte_16_buf_mask, (failAssign+1));
+                    SET_BIT(byte_16_buf_mask, (failAssign));
+                    SET_BIT(byte_16_buf_mask, (failAssign-1));
+                    
+                    *target=(tQueueElementType2 *)(&buffer[256+(7-(failAssign+1))*16]);
+                    tmpType2=(tQueueElementType2 *)*target;
+                    tmpType2->number=(failAssign+1);
+                    tmpType2->whichbuffer=2;
+                    printf("buffer location:%d\nwhichbuffer: %d\nwhich bit: %d\n",256+(7-(failAssign+1))*16,tmpType2->whichbuffer,tmpType2->number);
+               }
+               
+          }else{
+               //normal assign
+               
+               printf("location comeing start to fuLL:%d %d\n",normalAssignNumber,normalAssignNumber-1);
+               /*
+                assign area
+                
+                
+                */
+               SET_BIT(byte_32_buf_mask, normalAssignNumber);
+               SET_BIT(byte_32_buf_mask, (normalAssignNumber-1));
+               
+               *target=(tQueueElementType2 *)(&buffer[0+(7-normalAssignNumber)*32]);
+               tmpType2=(tQueueElementType2 *)*target;
+               tmpType2->number=normalAssignNumber;
+               tmpType2->whichbuffer=1;
+               printf("buffer location:%d\nwhichbuffer: %d\nwhich bit: %d\n",0+(7-normalAssignNumber)*32,tmpType2->whichbuffer,tmpType2->number);
+          }
+     }
+}
+void  ourFree (int type, void *target){
+     tQueueElementType1 *tmpType1;
+     tQueueElementType2 *tmpType2;
+     if (type==1) {
+          tmpType1=(tQueueElementType1 *)target;
+          if (tmpType1->whichbuffer==2) {
+               SET_ZBIT(byte_16_buf_mask, tmpType1->number);
+               SET_ZBIT(byte_16_buf_mask, (tmpType1->number-1));
+
+          }else if (tmpType1->whichbuffer==1){
+               SET_ZBIT(byte_32_buf_mask, tmpType1->number);
+          }
+          
+     }
+     else if (type==2){
+          tmpType2=(tQueueElementType2 *)target;
+          if (tmpType2->whichbuffer==1) {
+               SET_ZBIT(byte_32_buf_mask, tmpType2->number);
+               SET_ZBIT(byte_32_buf_mask, (tmpType2->number-1));
+          
+          }else if (tmpType2->whichbuffer==2){
+               SET_ZBIT(byte_16_buf_mask, tmpType2->number);
+               SET_ZBIT(byte_16_buf_mask, (tmpType2->number-1));
+               SET_ZBIT(byte_16_buf_mask, (tmpType2->number-2));
+          }
+     }
+}
+int myLocationIsFull(int type){
+     unsigned char mask;
+     //default location is full
+     int i,count=0,flag=1;
+     if (type==1) {
+          for (i = 0,mask = 0x80; i< 8; i++)
+          {
+               // if find continuous 2 location, set flag=2;
+               
+               if ((byte_16_buf_mask&mask) >> (7-i)==0) {
+                    count++;
+               }else if((byte_16_buf_mask&mask) >> (7-i)==1){
+                    count=0;
+               }
+          
+               if (count==2) {
+                    flag=i;
+                    break;
+               }
+               mask = mask >> 1;
+          }
+          if (count!=2) {
+               return 9;
+          }
+          
+     }
+     else if (type==2){
+          for (i = 0,mask = 0x80; i< 8; i++)
+          {
+               // if find continuous 3 location, set flag=3;
+               
+               if ((byte_32_buf_mask&mask) >> (7-i)==0) {
+                    count++;
+               }
+               else if((byte_32_buf_mask&mask) >> (7-i)==1){
+                    count=0;
+               }
+               
+               if (count==2) {
+                    flag=i;
+                    break;
+               }
+               mask = mask >> 1;
+          }
+          printf("inflag:%d\n",flag);
+          if (count!=2) {
+               return 9;
+          }
+          
+     }
+     //need to fix
+     
+     return  8-flag;
+}
+int  useOtherLocation(int type){
+     unsigned char mask;
+     int i,count=0,flag=1;
+     if (type==1) {
+          for (i = 0,mask = 0x80; i< 8; i++)
+          {
+               // 24 byte into 32 size;
+               // only use 1 bit area;
+               
+               if ((byte_32_buf_mask&mask) >> (7-i)==0) {
+                    count++;
+               }else if((byte_16_buf_mask&mask) >> (7-i)==1){
+                    count=0;
+               }
+               
+               if (count==1) {
+                    flag=i;
+                    break;
+               }
+               mask = mask >> 1;
+          }
+          printf("inflag:%d\n",flag);
+          if (count!=1) {
+               return 9;
+          }
+
+     }
+     
+     else if (type==2){
+          
+          for (i = 0,mask = 0x80; i< 8; i++)
+          {
+               // 40 byte into 16 size;
+               //  use 3 bit area;
+               if ((byte_16_buf_mask&mask) >> (7-i)==0) {
+                    count++;
+               }
+               else if((byte_16_buf_mask&mask) >> (7-i)==1){
+                    count=0;
+               }
+               
+               if (count==3) {
+                    flag=i;
+                    break;
+               }
+               mask = mask >> 1;
+          }
+          printf("inflag:%d\n",flag);
+          if (count!=3) {
+               return 9;
+          }
+          
+     }
+     return  8-flag;
+}
